@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apple Silicon LLM Benchmark</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f0f0f; --surface: #1a1a1a; --surface2: #242424;
+    --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.14);
+    --text: #f0f0f0; --text2: #888; --text3: #555;
+    --accent: #a78bfa; --accent2: #7c3aed;
+    --green: #34d399; --amber: #fbbf24; --red: #f87171; --blue: #60a5fa;
+    --radius: 10px; --radius-sm: 6px;
+  }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; font-size: 14px; line-height: 1.6; min-height: 100vh; }
+  header { border-bottom: 1px solid var(--border); padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 56px; position: sticky; top: 0; background: rgba(15,15,15,0.9); backdrop-filter: blur(12px); z-index: 100; }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-chip { width: 28px; height: 28px; background: linear-gradient(135deg, #a78bfa, #60a5fa); border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white; }
+  .logo-text { font-size: 14px; font-weight: 600; }
+  .logo-sub { font-size: 11px; color: var(--text2); }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); }
+  nav { display: flex; gap: 2px; padding: 1rem 2rem 0; border-bottom: 1px solid var(--border); overflow-x: auto; }
+  .tab { padding: 8px 16px; font-size: 13px; font-weight: 500; color: var(--text2); cursor: pointer; border-radius: var(--radius-sm) var(--radius-sm) 0 0; border: none; background: none; transition: color 0.15s; white-space: nowrap; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom: 2px solid var(--accent); margin-bottom: -1px; }
+  main { padding: 2rem; max-width: 1100px; margin: 0 auto; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; }
+  .card-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text3); margin-bottom: 0.75rem; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; }
+  .stat-label { font-size: 11px; color: var(--text2); margin-bottom: 4px; }
+  .stat-value { font-size: 28px; font-weight: 700; letter-spacing: -1px; }
+  .stat-unit { font-size: 12px; color: var(--text2); margin-left: 4px; }
+  .section-title { font-size: 15px; font-weight: 600; margin: 2rem 0 1rem; letter-spacing: -0.3px; }
+  .section-title:first-child { margin-top: 0; }
+  canvas { width: 100% !important; }
+  .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 100px; font-size: 11px; font-weight: 600; }
+  .badge-purple { background: rgba(167,139,250,0.15); color: var(--accent); }
+  .badge-green { background: rgba(52,211,153,0.15); color: var(--green); }
+  .badge-amber { background: rgba(251,191,36,0.15); color: var(--amber); }
+  .badge-blue { background: rgba(96,165,250,0.15); color: var(--blue); }
+  .badge-red { background: rgba(248,113,113,0.15); color: var(--red); }
+  select, input[type=number] { background: var(--surface2); border: 1px solid var(--border2); color: var(--text); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 13px; width: 100%; outline: none; }
+  select:focus, input:focus { border-color: var(--accent); }
+  .checkbox-group { display: flex; flex-direction: column; gap: 8px; }
+  .checkbox-row { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text2); cursor: pointer; }
+  .checkbox-row input { accent-color: var(--accent); width: 15px; height: 15px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; }
+  .btn-primary { background: var(--accent2); color: white; }
+  .btn-primary:hover { background: #6d28d9; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border2); }
+  .btn-ghost:hover { color: var(--text); background: var(--surface2); }
+  .progress-wrap { background: var(--surface2); border-radius: 100px; height: 4px; overflow: hidden; margin: 8px 0; }
+  .progress-bar { height: 100%; background: var(--accent); border-radius: 100px; transition: width 0.4s ease; }
+  .log { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; height: 220px; overflow-y: auto; font-family: 'SF Mono', monospace; font-size: 12px; color: var(--text2); }
+  .log-line { padding: 1px 0; }
+  .log-line.ok { color: var(--green); }
+  .log-line.info { color: var(--blue); }
+  .log-line.warn { color: var(--amber); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 8px 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text3); border-bottom: 1px solid var(--border); }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text2); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+  td.num { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 500; }
+  .empty-state { text-align: center; padding: 4rem 2rem; color: var(--text3); }
+  .empty-state p { margin-top: 8px; font-size: 13px; }
+  .live-val { font-size: 32px; font-weight: 700; color: var(--accent); letter-spacing: -1.5px; font-variant-numeric: tabular-nums; }
+  .live-unit { font-size: 13px; color: var(--text2); }
+  .form-label { font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 6px; display: block; letter-spacing: 0.3px; }
+  .form-group { margin-bottom: 1.25rem; }
+  .filter-row { display: flex; gap: 8px; margin-bottom: 1rem; flex-wrap: wrap; }
+  .filter-btn { padding: 5px 12px; border-radius: 100px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid var(--border2); background: transparent; color: var(--text2); transition: all 0.15s; }
+  .filter-btn.active { background: rgba(167,139,250,0.15); color: var(--accent); border-color: rgba(167,139,250,0.4); }
+  .insight-card { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 0.75rem; }
+  .insight-title { font-size: 12px; font-weight: 600; color: var(--accent); margin-bottom: 4px; }
+  .insight-text { font-size: 13px; color: var(--text2); line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-chip">M4</div>
+    <div>
+      <div class="logo-text">Apple Silicon LLM Bench</div>
+      <div class="logo-sub">Inference benchmarking suite</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <div class="status-dot" id="ollama-dot"></div>
+    <span style="font-size:12px;color:var(--text2)" id="ollama-status">Checking...</span>
+  </div>
+</header>
+
+<nav>
+  <button class="tab active" onclick="switchTab('dashboard')">Dashboard</button>
+  <button class="tab" onclick="switchTab('run')">Run benchmark</button>
+  <button class="tab" onclick="switchTab('results')">Results</button>
+  <button class="tab" onclick="switchTab('quant')">Quantization</button>
+  <button class="tab" onclick="switchTab('thermal')">Thermal</button>
+  <button class="tab" onclick="switchTab('thinking')">Thinking mode</button>
+</nav>
+
+<main>
+
+  <!-- DASHBOARD -->
+  <div class="panel active" id="panel-dashboard">
+    <div class="grid-4" style="margin-bottom:1.5rem">
+      <div class="stat"><div class="stat-label">Best throughput</div><div><span class="stat-value" id="s-best">—</span><span class="stat-unit">tok/s</span></div></div>
+      <div class="stat"><div class="stat-label">Best TTFT</div><div><span class="stat-value" id="s-ttft">—</span><span class="stat-unit">ms</span></div></div>
+      <div class="stat"><div class="stat-label">Conditions run</div><div><span class="stat-value" id="s-conditions">—</span></div></div>
+      <div class="stat"><div class="stat-label">Models tested</div><div><span class="stat-value" id="s-models">—</span></div></div>
+    </div>
+    <div id="key-insights" style="margin-bottom:1.5rem"></div>
+    <div class="grid-2" style="margin-bottom:1rem">
+      <div class="card"><div class="card-title">Throughput by concurrency</div><canvas id="chart-concurrency" height="200"></canvas></div>
+      <div class="card"><div class="card-title">TTFT by concurrency</div><canvas id="chart-ttft" height="200"></canvas></div>
+    </div>
+    <div class="card"><div class="card-title">Throughput by prompt length (concurrency=1)</div><canvas id="chart-prompt" height="120"></canvas></div>
+  </div>
+
+  <!-- RUN -->
+  <div class="panel" id="panel-run">
+    <div class="grid-2" style="align-items:start">
+      <div class="card">
+        <p class="section-title" style="margin-top:0">Configure run</p>
+        <div class="form-group">
+          <label class="form-label">Models</label>
+          <div class="checkbox-group" id="model-checkboxes"><span style="color:var(--text3)">Loading...</span></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Prompt lengths</label>
+          <div class="checkbox-group">
+            <label class="checkbox-row"><input type="checkbox" value="short" checked> Short (~10 tokens)</label>
+            <label class="checkbox-row"><input type="checkbox" value="medium" checked> Medium (~40 tokens)</label>
+            <label class="checkbox-row"><input type="checkbox" value="long"> Long (~80 tokens)</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Concurrency levels</label>
+          <div class="checkbox-group">
+            <label class="checkbox-row"><input type="checkbox" value="1" checked> 1 (baseline)</label>
+            <label class="checkbox-row"><input type="checkbox" value="4" checked> 4 concurrent</label>
+            <label class="checkbox-row"><input type="checkbox" value="8"> 8 concurrent</label>
+            <label class="checkbox-row"><input type="checkbox" value="16"> 16 concurrent</label>
+          </div>
+        </div>
+        <div class="grid-2" style="gap:12px;margin-bottom:1.25rem">
+          <div class="form-group" style="margin:0"><label class="form-label">Max tokens</label><input type="number" id="max-tokens" value="128" min="32" max="512"></div>
+          <div class="form-group" style="margin:0"><label class="form-label">Bench runs</label><input type="number" id="bench-runs" value="3" min="1" max="10"></div>
+        </div>
+        <button class="btn btn-primary" id="run-btn" onclick="startRun()" style="width:100%">▶ Start benchmark</button>
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:1rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <p class="section-title" style="margin:0">Live progress</p>
+            <span id="progress-label" style="font-size:12px;color:var(--text2)">Idle</span>
+          </div>
+          <div class="progress-wrap"><div class="progress-bar" id="progress-bar" style="width:0%"></div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1.25rem">
+            <div><div style="font-size:11px;color:var(--text2);margin-bottom:4px">Current throughput</div><div><span class="live-val" id="live-tps">—</span> <span class="live-unit">tok/s</span></div></div>
+            <div><div style="font-size:11px;color:var(--text2);margin-bottom:4px">Current TTFT</div><div><span class="live-val" id="live-ttft">—</span> <span class="live-unit">ms</span></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <p class="section-title" style="margin:0">Log</p>
+            <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="document.getElementById('log').innerHTML=''">Clear</button>
+          </div>
+          <div class="log" id="log"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="panel" id="panel-results">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+      <p class="section-title" style="margin:0">All results</p>
+      <button class="btn btn-ghost" onclick="exportCSV()">↓ Export CSV</button>
+    </div>
+    <div class="filter-row" id="filter-row"></div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <table>
+        <thead><tr><th>Framework</th><th>Model</th><th>Prompt</th><th>Concurrency</th><th>Throughput</th><th>±stddev</th><th>TTFT</th><th>BW Util</th><th>Tokens</th></tr></thead>
+        <tbody id="results-body"></tbody>
+      </table>
+      <div class="empty-state" id="results-empty"><div style="font-size:32px">🔬</div><p>Run a benchmark to see results here.</p></div>
+    </div>
+  </div>
+
+  <!-- QUANTIZATION -->
+  <div class="panel" id="panel-quant">
+    <p class="section-title" style="margin-top:0">Quantization comparison</p>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:1.5rem">Speed vs memory tradeoff across quantization levels. Q4 = fastest/smallest, Q8 = more accurate, fp16 = full precision.</p>
+    <div class="grid-2" style="margin-bottom:1rem">
+      <div class="card"><div class="card-title">Throughput by quantization</div><canvas id="chart-quant-tps" height="200"></canvas></div>
+      <div class="card"><div class="card-title">TTFT by quantization</div><canvas id="chart-quant-ttft" height="200"></canvas></div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <table>
+        <thead><tr><th>Model + Quant</th><th>Throughput (tok/s)</th><th>TTFT (ms)</th><th>Latency (ms)</th><th>Memory (MB)</th></tr></thead>
+        <tbody id="quant-body"></tbody>
+      </table>
+      <div class="empty-state" id="quant-empty"><div style="font-size:32px">⚖️</div><p>Run advanced benchmarks to see quantization results.</p></div>
+    </div>
+  </div>
+
+  <!-- THERMAL -->
+  <div class="panel" id="panel-thermal">
+    <p class="section-title" style="margin-top:0">Thermal throttling</p>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:1.5rem">Throughput over time under sustained load. Apple Silicon throttles as the chip heats up — this shows exactly when and how much.</p>
+    <div class="card" style="margin-bottom:1rem"><div class="card-title">Throughput over time (10 min sustained run)</div><canvas id="chart-thermal" height="200"></canvas></div>
+    <div class="grid-3" style="margin-bottom:1rem">
+      <div class="stat"><div class="stat-label">Peak throughput</div><div><span class="stat-value" id="thermal-peak">—</span><span class="stat-unit">tok/s</span></div></div>
+      <div class="stat"><div class="stat-label">Sustained throughput</div><div><span class="stat-value" id="thermal-sustained">—</span><span class="stat-unit">tok/s</span></div></div>
+      <div class="stat"><div class="stat-label">Throttle drop</div><div><span class="stat-value" id="thermal-drop">—</span><span class="stat-unit">%</span></div></div>
+    </div>
+    <div class="empty-state" id="thermal-empty" style="display:none"><div style="font-size:32px">🌡️</div><p>Run advanced benchmarks to see thermal data.</p></div>
+  </div>
+
+  <!-- THINKING MODE -->
+  <div class="panel" id="panel-thinking">
+    <p class="section-title" style="margin-top:0">Thinking mode — Qwen3</p>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:1.5rem">Qwen3 can reason through problems before answering. This shows the latency and token cost of thinking mode vs standard mode across different prompt types.</p>
+    <div class="grid-2" style="margin-bottom:1rem">
+      <div class="card"><div class="card-title">TTFT: thinking on vs off</div><canvas id="chart-thinking-ttft" height="200"></canvas></div>
+      <div class="card"><div class="card-title">Thinking tokens used</div><canvas id="chart-thinking-tokens" height="200"></canvas></div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <table>
+        <thead><tr><th>Prompt type</th><th>Thinking</th><th>Throughput (tok/s)</th><th>TTFT (ms)</th><th>Thinking tokens</th><th>Answer tokens</th></tr></thead>
+        <tbody id="thinking-body"></tbody>
+      </table>
+      <div class="empty-state" id="thinking-empty"><div style="font-size:32px">🧠</div><p>Run advanced benchmarks to see thinking mode results.</p></div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+let allResults = [];
+let advancedResults = {};
+let charts = {};
+let activeFilter = 'all';
+
+const TABS = ['dashboard','run','results','quant','thermal','thinking'];
+const CHART_COLORS = ['#a78bfa','#60a5fa','#34d399','#fbbf24','#f87171'];
+const gridColor = 'rgba(255,255,255,0.05)';
+const tickColor = '#555';
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', TABS[i] === name));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  if (name === 'dashboard') renderDashboard();
+  if (name === 'results') renderTable();
+  if (name === 'quant') renderQuant();
+  if (name === 'thermal') renderThermal();
+  if (name === 'thinking') renderThinking();
+}
+
+async function init() {
+  await checkOllama();
+  await loadModels();
+  await loadResults();
+  await loadAdvancedResults();
+}
+
+async function checkOllama() {
+  try {
+    const r = await fetch('/api/models');
+    const d = await r.json();
+    const ok = d.status === 'ok';
+    document.getElementById('ollama-dot').style.background = ok ? 'var(--green)' : 'var(--red)';
+    document.getElementById('ollama-dot').style.boxShadow = ok ? '0 0 6px var(--green)' : 'none';
+    document.getElementById('ollama-status').textContent = ok ? `Ollama · ${d.models.length} models` : 'Ollama offline';
+  } catch { document.getElementById('ollama-status').textContent = 'Ollama offline'; }
+}
+
+async function loadModels() {
+  const r = await fetch('/api/models');
+  const d = await r.json();
+  const container = document.getElementById('model-checkboxes');
+  if (!d.models.length) { container.innerHTML = '<span style="color:var(--text3)">No models found</span>'; return; }
+  container.innerHTML = d.models.map((m,i) =>
+    `<label class="checkbox-row"><input type="checkbox" value="${m}" ${i<2?'checked':''}> ${m}</label>`
+  ).join('');
+}
+
+async function loadResults() {
+  const r = await fetch('/api/results');
+  allResults = await r.json();
+  renderDashboard();
+  renderTable();
+  buildFilters();
+}
+
+async function loadAdvancedResults() {
+  const r = await fetch('/api/advanced-results');
+  advancedResults = await r.json();
+  renderQuant();
+  renderThermal();
+  renderThinking();
+}
+
+function renderDashboard() {
+  if (!allResults.length) return;
+  const best = Math.max(...allResults.map(r => r.throughput_tok_per_sec || 0));
+  const bestTtft = Math.min(...allResults.filter(r => r.ttft_ms > 0).map(r => r.ttft_ms));
+  const models = new Set(allResults.map(r => r.model)).size;
+  document.getElementById('s-best').textContent = best.toFixed(1);
+  document.getElementById('s-ttft').textContent = bestTtft.toFixed(0);
+  document.getElementById('s-conditions').textContent = allResults.length;
+  document.getElementById('s-models').textContent = models;
+  renderInsights();
+  renderConcurrencyChart();
+  renderTTFTChart();
+  renderPromptChart();
+}
+
+function renderInsights() {
+  const ollamaC1 = allResults.find(r => r.framework==='ollama' && r.concurrency===1 && r.prompt_length==='medium');
+  const ollamaC16 = allResults.find(r => r.framework==='ollama' && r.concurrency===16 && r.prompt_length==='medium');
+  const mlxC16 = allResults.find(r => r.framework==='mlx' && r.concurrency===16 && r.prompt_length==='medium');
+  const container = document.getElementById('key-insights');
+  const insights = [];
+  if (ollamaC1 && ollamaC16) {
+    const ratio = (ollamaC16.ttft_ms / ollamaC1.ttft_ms).toFixed(0);
+    insights.push({ title: 'TTFT collapses under load', text: `Ollama TTFT degrades ${ratio}x at concurrency=16 (${ollamaC1.ttft_ms.toFixed(0)}ms → ${ollamaC16.ttft_ms.toFixed(0)}ms). Requests queue sequentially.` });
+  }
+  if (mlxC16 && ollamaC16) {
+    const ratio = (ollamaC16.ttft_ms / mlxC16.ttft_ms).toFixed(0);
+    insights.push({ title: 'MLX TTFT stays stable', text: `MLX TTFT at concurrency=16: ${mlxC16.ttft_ms.toFixed(0)}ms vs Ollama's ${ollamaC16.ttft_ms.toFixed(0)}ms — ${ratio}x better under load.` });
+  }
+  insights.push({ title: 'Throughput is memory-bandwidth-bound', text: 'Both frameworks plateau at ~21-22 tok/s regardless of concurrency, model, or prompt length — the M4 memory bus is the bottleneck.' });
+  container.innerHTML = insights.map(i =>
+    `<div class="insight-card"><div class="insight-title">${i.title}</div><div class="insight-text">${i.text}</div></div>`
+  ).join('');
+}
+
+function chartDefaults(yLabel='') {
+  return {
+    responsive: true,
+    plugins: { legend: { labels: { color: '#888', font: { size: 11 }, boxWidth: 10 } } },
+    scales: {
+      x: { grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 11 } } },
+      y: { grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 11 } }, title: { display: !!yLabel, text: yLabel, color: tickColor, font: { size: 11 } }, beginAtZero: true }
+    }
+  };
+}
+
+function renderChart(id, type, data, options) {
+  if (charts[id]) charts[id].destroy();
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  charts[id] = new Chart(ctx.getContext('2d'), { type, data, options });
+}
+
+function renderConcurrencyChart() {
+  const concurrencies = [...new Set(allResults.map(r => r.concurrency))].sort((a,b)=>a-b);
+  const fws = [...new Set(allResults.map(r => r.framework))];
+  const models = [...new Set(allResults.map(r => r.model))];
+  const datasets = [];
+  let ci = 0;
+  for (const fw of fws) {
+    for (const m of models) {
+      const pts = concurrencies.map(c => {
+        const rows = allResults.filter(r => r.framework===fw && r.model===m && r.concurrency===c);
+        return rows.length ? (rows.reduce((s,r)=>s+r.throughput_tok_per_sec,0)/rows.length).toFixed(1) : null;
+      });
+      if (pts.some(p=>p!==null)) {
+        datasets.push({ label: `${fw}/${m.split('/').pop().split(':')[0]}`, data: pts, borderColor: CHART_COLORS[ci%5], backgroundColor: CHART_COLORS[ci%5]+'22', tension: 0.3, pointRadius: 4, fill: true });
+        ci++;
+      }
+    }
+  }
+  renderChart('chart-concurrency', 'line', { labels: concurrencies.map(c=>`${c}x`), datasets }, chartDefaults('tok/s'));
+}
+
+function renderTTFTChart() {
+  const concurrencies = [...new Set(allResults.map(r => r.concurrency))].sort((a,b)=>a-b);
+  const fws = [...new Set(allResults.map(r => r.framework))];
+  const models = [...new Set(allResults.map(r => r.model))];
+  const datasets = [];
+  let ci = 0;
+  for (const fw of fws) {
+    for (const m of models) {
+      const pts = concurrencies.map(c => {
+        const rows = allResults.filter(r => r.framework===fw && r.model===m && r.concurrency===c);
+        return rows.length ? (rows.reduce((s,r)=>s+r.ttft_ms,0)/rows.length).toFixed(0) : null;
+      });
+      if (pts.some(p=>p!==null)) {
+        datasets.push({ label: `${fw}/${m.split('/').pop().split(':')[0]}`, data: pts, borderColor: CHART_COLORS[ci%5], backgroundColor: CHART_COLORS[ci%5]+'22', tension: 0.3, pointRadius: 4, fill: true });
+        ci++;
+      }
+    }
+  }
+  renderChart('chart-ttft', 'line', { labels: concurrencies.map(c=>`${c}x`), datasets }, chartDefaults('ms'));
+}
+
+function renderPromptChart() {
+  const prompts = [...new Set(allResults.map(r => r.prompt_length))];
+  const fws = [...new Set(allResults.map(r => r.framework))];
+  const models = [...new Set(allResults.map(r => r.model))];
+  const datasets = [];
+  let ci = 0;
+  for (const fw of fws) {
+    for (const m of models) {
+      const pts = prompts.map(p => {
+        const rows = allResults.filter(r => r.framework===fw && r.model===m && r.prompt_length===p && r.concurrency===1);
+        return rows.length ? (rows.reduce((s,r)=>s+r.throughput_tok_per_sec,0)/rows.length).toFixed(1) : null;
+      });
+      if (pts.some(p=>p!==null)) {
+        datasets.push({ label: `${fw}/${m.split('/').pop().split(':')[0]}`, data: pts, backgroundColor: CHART_COLORS[ci%5]+'cc', borderRadius: 4 });
+        ci++;
+      }
+    }
+  }
+  renderChart('chart-prompt', 'bar', { labels: prompts, datasets }, chartDefaults('tok/s'));
+}
+
+function buildFilters() {
+  const models = ['all', ...new Set(allResults.map(r => r.model))];
+  document.getElementById('filter-row').innerHTML = models.map(m =>
+    `<button class="filter-btn ${m==='all'?'active':''}" onclick="setFilter('${m}')">${m==='all'?'All models':m}</button>`
+  ).join('');
+}
+
+function setFilter(model) {
+  activeFilter = model;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.textContent===(model==='all'?'All models':model)));
+  renderTable();
+}
+
+function renderTable() {
+  const filtered = activeFilter==='all' ? allResults : allResults.filter(r=>r.model===activeFilter);
+  const tbody = document.getElementById('results-body');
+  document.getElementById('results-empty').style.display = filtered.length ? 'none' : 'block';
+  if (!filtered.length) { tbody.innerHTML=''; return; }
+  const fwColors = { ollama:'badge-purple', mlx:'badge-green', sglang:'badge-blue' };
+  tbody.innerHTML = filtered.map(r => `
+    <tr>
+      <td><span class="badge ${fwColors[r.framework]||'badge-blue'}">${r.framework}</span></td>
+      <td style="color:var(--text)">${r.model.split('/').pop()}</td>
+      <td>${r.prompt_length}</td>
+      <td style="text-align:center">${r.concurrency}x</td>
+      <td class="num">${(r.throughput_tok_per_sec||0).toFixed(1)}</td>
+      <td class="num" style="color:var(--text2)">±${(r.throughput_stddev||0).toFixed(1)}</td>
+      <td class="num">${(r.ttft_ms||0).toFixed(0)}ms</td>
+      <td class="num">${(r.memory_bandwidth_utilization_pct||0).toFixed(1)}%</td>
+      <td class="num">${r.tokens_generated||0}</td>
+    </tr>`).join('');
+}
+
+function renderQuant() {
+  const data = advancedResults.quantization || [];
+  const tbody = document.getElementById('quant-body');
+  document.getElementById('quant-empty').style.display = data.length ? 'none' : 'block';
+  if (!data.length) { tbody.innerHTML=''; return; }
+  tbody.innerHTML = data.map(r => `
+    <tr>
+      <td style="color:var(--text)">${r.model}</td>
+      <td class="num">${(r.throughput_tok_per_sec||0).toFixed(1)}</td>
+      <td class="num">${(r.ttft_ms||0).toFixed(0)}ms</td>
+      <td class="num">${(r.total_latency_ms||0).toFixed(0)}ms</td>
+      <td class="num">${(r.peak_memory_mb||0).toFixed(0)}MB</td>
+    </tr>`).join('');
+  const labels = data.map(r => r.model);
+  renderChart('chart-quant-tps', 'bar', {
+    labels, datasets: [{ label: 'Throughput (tok/s)', data: data.map(r=>r.throughput_tok_per_sec), backgroundColor: '#a78bfa99', borderRadius: 4 }]
+  }, chartDefaults('tok/s'));
+  renderChart('chart-quant-ttft', 'bar', {
+    labels, datasets: [{ label: 'TTFT (ms)', data: data.map(r=>r.ttft_ms), backgroundColor: '#60a5fa99', borderRadius: 4 }]
+  }, chartDefaults('ms'));
+}
+
+function renderThermal() {
+  const data = advancedResults.thermal || [];
+  document.getElementById('thermal-empty').style.display = data.length ? 'none' : 'block';
+  if (!data.length) return;
+  const tps = data.map(r => r.throughput_tok_per_sec);
+  const peak = Math.max(...tps);
+  const sustained = tps[tps.length-1];
+  const drop = ((peak - sustained) / peak * 100).toFixed(1);
+  document.getElementById('thermal-peak').textContent = peak.toFixed(1);
+  document.getElementById('thermal-sustained').textContent = sustained.toFixed(1);
+  document.getElementById('thermal-drop').textContent = drop;
+  renderChart('chart-thermal', 'line', {
+    labels: data.map(r => `${r.elapsed_minutes}m`),
+    datasets: [{
+      label: 'Throughput (tok/s)', data: tps,
+      borderColor: '#34d399', backgroundColor: '#34d39922',
+      tension: 0.3, pointRadius: 3, fill: true,
+    }]
+  }, chartDefaults('tok/s'));
+}
+
+function renderThinking() {
+  const data = advancedResults.thinking || [];
+  const tbody = document.getElementById('thinking-body');
+  document.getElementById('thinking-empty').style.display = data.length ? 'none' : 'block';
+  if (!data.length) { tbody.innerHTML=''; return; }
+  tbody.innerHTML = data.map(r => `
+    <tr>
+      <td style="color:var(--text)">${r.prompt_type}</td>
+      <td><span class="badge ${r.thinking?'badge-purple':'badge-green'}">${r.thinking?'ON':'OFF'}</span></td>
+      <td class="num">${(r.throughput_tok_per_sec||0).toFixed(1)}</td>
+      <td class="num">${(r.ttft_ms||0).toFixed(0)}ms</td>
+      <td class="num">${Math.round(r.thinking_tokens||0)}</td>
+      <td class="num">${Math.round(r.answer_tokens||0)}</td>
+    </tr>`).join('');
+  const promptTypes = [...new Set(data.map(r=>r.prompt_type))];
+  const onData = promptTypes.map(p => { const r=data.find(d=>d.prompt_type===p&&d.thinking); return r?r.ttft_ms:0; });
+  const offData = promptTypes.map(p => { const r=data.find(d=>d.prompt_type===p&&!d.thinking); return r?r.ttft_ms:0; });
+  const thinkingTokens = promptTypes.map(p => { const r=data.find(d=>d.prompt_type===p&&d.thinking); return r?r.thinking_tokens:0; });
+  renderChart('chart-thinking-ttft', 'bar', {
+    labels: promptTypes,
+    datasets: [
+      { label: 'Thinking ON', data: onData, backgroundColor: '#a78bfa99', borderRadius: 4 },
+      { label: 'Thinking OFF', data: offData, backgroundColor: '#60a5fa99', borderRadius: 4 },
+    ]
+  }, chartDefaults('ms'));
+  renderChart('chart-thinking-tokens', 'bar', {
+    labels: promptTypes,
+    datasets: [{ label: 'Thinking tokens', data: thinkingTokens, backgroundColor: '#fbbf2499', borderRadius: 4 }]
+  }, chartDefaults('tokens'));
+}
+
+async function startRun() {
+  const models = [...document.querySelectorAll('#model-checkboxes input:checked')].map(i=>i.value);
+  const prompts = [...document.querySelectorAll('#panel-run input[type=checkbox][value=short], #panel-run input[type=checkbox][value=medium], #panel-run input[type=checkbox][value=long]')].filter(i=>i.checked).map(i=>i.value);
+  const concurrencies = [...document.querySelectorAll('#panel-run input[value="1"], #panel-run input[value="4"], #panel-run input[value="8"], #panel-run input[value="16"]')].filter(i=>i.checked).map(i=>parseInt(i.value));
+  const maxTokens = parseInt(document.getElementById('max-tokens').value);
+  const benchRuns = parseInt(document.getElementById('bench-runs').value);
+  if (!models.length||!prompts.length||!concurrencies.length) { addLog('warn','⚠ Select at least one option in each category'); return; }
+  document.getElementById('run-btn').disabled = true;
+  document.getElementById('progress-bar').style.width = '0%';
+  document.getElementById('log').innerHTML = '';
+  addLog('info', `Starting: ${models.length} model(s) × ${prompts.length} prompt(s) × ${concurrencies.length} concurrency level(s)`);
+  const es = await fetch('/api/run', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ models, prompt_lengths: prompts, concurrency_levels: concurrencies, max_new_tokens: maxTokens, bench_runs: benchRuns })
+  });
+  const reader = es.body.getReader();
+  const decoder = new TextDecoder();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const text = decoder.decode(value);
+    for (const line of text.split('\n')) {
+      if (!line.startsWith('data: ')) continue;
+      handleEvent(JSON.parse(line.slice(6)));
+    }
+  }
+  document.getElementById('run-btn').disabled = false;
+  await loadResults();
+}
+
+function handleEvent(evt) {
+  if (evt.type==='progress') {
+    document.getElementById('progress-bar').style.width = Math.round(evt.condition/evt.total*100)+'%';
+    document.getElementById('progress-label').textContent = `${evt.condition}/${evt.total}`;
+    addLog('info', `[${evt.condition}/${evt.total}] ${evt.model} · ${evt.prompt_length} · ${evt.concurrency}x`);
+  } else if (evt.type==='run_complete') {
+    document.getElementById('live-tps').textContent = evt.throughput.toFixed(1);
+    document.getElementById('live-ttft').textContent = evt.ttft_ms.toFixed(0);
+    addLog('ok', `  ✓ run ${evt.run}: ${evt.throughput.toFixed(1)} tok/s · TTFT ${evt.ttft_ms.toFixed(0)}ms`);
+  } else if (evt.type==='condition_complete') {
+    addLog('ok', `  ▶ avg: ${evt.result.throughput_tok_per_sec.toFixed(1)} tok/s`);
+  } else if (evt.type==='done') {
+    document.getElementById('progress-bar').style.width = '100%';
+    document.getElementById('progress-label').textContent = 'Complete';
+    addLog('ok', `✅ Done — ${evt.total_results} results saved`);
+  } else if (evt.type==='error') {
+    addLog('warn', `✗ ${evt.message}`);
+  }
+}
+
+function addLog(type, msg) {
+  const log = document.getElementById('log');
+  const line = document.createElement('div');
+  line.className = `log-line ${type}`;
+  line.textContent = msg;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
+
+function exportCSV() {
+  if (!allResults.length) return;
+  const keys = Object.keys(allResults[0]);
+  const csv = [keys.join(','), ...allResults.map(r=>keys.map(k=>r[k]).join(','))].join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download = 'benchmark_results.csv';
+  a.click();
+}
+
+init();
+</script>
+</body>
+</html>

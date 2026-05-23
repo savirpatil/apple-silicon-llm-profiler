@@ -1,0 +1,28 @@
+concurrency_levels: [1, 4, 8, 16]
+
+prompt_lengths:
+  short:
+    tokens: 64
+    text: "Explain what machine learning is in one sentence."
+  medium:
+    tokens: 256
+    text: "Write a detailed explanation of how transformer attention mechanisms work, covering the key-query-value structure and why it's useful for language modeling."
+  long:
+    tokens: 512
+    text: "You are an expert in distributed systems. Please explain in detail: 1) The CAP theorem and its implications, 2) How modern databases like Cassandra and DynamoDB handle consistency vs availability tradeoffs, 3) What eventual consistency means in practice, and 4) How you would design a globally distributed key-value store that prioritizes availability."
+
+batch_sizes: [1, 4, 8]
+
+max_new_tokens: 128
+num_warmup_runs: 2
+num_benchmark_runs: 5
+
+models:
+  qwen3_7b:
+    ollama_name: "qwen3:7b"
+    hf_name: "Qwen/Qwen3-7B"
+    mlx_name: "mlx-community/Qwen3-7B-4bit"
+  llama_31_8b:
+    ollama_name: "llama3.1:8b"
+    hf_name: "meta-llama/Meta-Llama-3.1-8B"
+    mlx_name: "mlx-community/Meta-Llama-3.1-8B-4bit"
