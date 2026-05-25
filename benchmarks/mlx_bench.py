@@ -1,14 +1,20 @@
 """
-MLX Benchmark — Apple's native ML framework.
+MLX Benchmark: Apple's native ML framework.
 
-MLX runs directly on Apple Silicon's GPU via Metal, with unified
-memory meaning there's no CPU↔GPU data transfer overhead. This is
-why MLX typically outperforms Ollama/llama.cpp by 3-5x on M-series.
+This module provides an MLX benchmark implementation used to
+measure inference latency, first-token time (TTFT), throughput, and
+peak memory on Apple Silicon GPUs.
 
-We use mlx-lm which wraps MLX with LLM-specific optimizations:
-- 4-bit quantization (models fit easily in 16GB)
-- KV cache for fast generation
-- Streaming token generation so we get real TTFT measurements
+MLX runs on Metal with unified memory and is typically used via mlx-lm,
+which adds LLM-specific optimizations: 4-bit/8-bit quantization, KV
+cache for fast generation, and streaming token generation. This
+benchmark streams tokens one-at-a-time to capture true TTFT and
+reports per-request averages.
+
+Recommended notes:
+- Quantization choices: Q4 (4-bit, fastest, ~4GB for 7B), Q8 (8-bit,
+  balanced, ~8GB), fp16 (16-bit, most accurate, ~14GB).
+- Streaming generation provides accurate TTFT measurements.
 """
 
 import time
@@ -46,11 +52,10 @@ class MLXBenchmark:
     ) -> BenchmarkResult:
         """
         MLX generates tokens one at a time via a Python generator.
-        This gives us true streaming — we catch the exact first token time.
+        This gives true streaming where we can catch the exact first token time.
         
         Note: MLX doesn't support true concurrency (one GPU, one model).
         We run concurrency=N sequentially and report per-request averages.
-        This is honest — it's what a single MLX process can do.
         """
         from mlx_lm import stream_generate
 

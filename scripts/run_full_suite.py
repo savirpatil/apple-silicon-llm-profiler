@@ -1,9 +1,21 @@
 #!/usr/bin/env python3
 """
-Full benchmark suite: Ollama (Metal) + MLX across all conditions.
-This is the final benchmark entrypoint that produces all results
-for the README and W&B dashboard.
+Orchestrator for the full benchmark suite.
+
+This script runs the complete set of benchmarks across configured
+models and backends, coordinating long and short tests, aggregating
+results, and producing final artifacts for reporting.
+
+Core responsibilities:
+- Sequence baseline, advanced, and sweep runs per config.
+- Handle job scheduling, optional parallelism, and result consolidation.
+- Emit well-structured outputs for downstream analysis and CI artifacts.
+
+Recommended notes:
+- Expect longer execution times; provide resumption/checkpointing.
+- Use models.yaml (if present) to parameterize runs.
 """
+
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

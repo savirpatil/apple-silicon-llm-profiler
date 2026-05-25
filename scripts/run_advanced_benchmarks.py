@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
 """
-Advanced benchmarks:
-1. MLX (Apple native)
-2. Quantization comparison
-3. Thermal throttling
-4. Thinking mode (Qwen3)
+Driver for advanced or long-running benchmarks.
+
+This script runs extended workloads (thermal, quantization sweeps,
+thinking / chain-of-thought tests) that are slower or heavier than
+baseline runs. Intended for stress-testing and in-depth comparison.
+
+Core responsibilities:
+- Orchestrate multi-stage runs (warmup, sustained load, cooldown).
+- Collect interval metrics to observe drift/throttling.
+- Save detailed traces and per-interval measurements for analysis.
+
+Recommended notes:
+- Run on a machine with sufficient cooling and monitoring.
+- Provide flags to limit duration or skip long phases for quick tests.
 """
+
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

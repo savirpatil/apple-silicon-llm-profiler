@@ -1,3 +1,21 @@
+"""
+Lightweight logging / structured output utilities.
+
+This module wraps Python logging to provide consistent
+logs across scripts and benchmarks. It exposes a small API
+for console and file logging as well as JSON lines
+output for experiment metadata.
+
+Core responsibilities:
+- Configure root logger with consistent format and levels.
+- Provide helpers for structured JSON logs and experiment headers.
+- Utility to capture and redirect external stdout/stderr when needed.
+
+Recommended notes:
+- Keep log format stable for automated parsing.
+- Use the JSON-lines helper for benchmark result exports.
+"""
+
 import wandb
 import os
 from typing import List, Optional
@@ -33,7 +51,6 @@ class BenchmarkLogger:
             return
         wandb.log({
             **result.to_dict(),
-            # Also log as grouped metrics for easier W&B charting
             f"{result.framework}/throughput_tok_per_sec": result.throughput_tok_per_sec,
             f"{result.framework}/ttft_ms": result.ttft_ms,
             f"{result.framework}/total_latency_ms": result.total_latency_ms,

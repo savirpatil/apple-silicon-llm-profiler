@@ -1,18 +1,17 @@
 """
-Quantization benchmark — measures speed vs memory tradeoff
-across different quantization levels.
+Quantization Benchmark: speed vs memory tradeoffs.
 
-Quantization = compressing model weights from 16-bit floats
-to lower precision (8-bit, 4-bit). You lose some accuracy
-but gain massive speed and memory improvements.
+This module measures performance and memory use across different
+quantization levels (e.g., Q4, Q8, fp16). The goal is to produce
+simple, comparable metrics (throughput, latency, peak memory) so
+you can choose a quantization strategy that fits your hardware and
+accuracy requirements.
 
-Q4 = 4-bit quantization (~4GB for 7B model, fastest)
-Q8 = 8-bit quantization (~8GB for 7B model, more accurate)
-fp16 = full 16-bit (~14GB for 7B model, most accurate, slowest)
-
-On Apple Silicon this is especially interesting because unified
-memory means the GPU and CPU share the same pool — a larger
-model directly competes with your OS and other apps for RAM.
+Recommended notes:
+- Q4 (4-bit): smallest memory footprint and highest throughput.
+- Q8 (8-bit): balance between size and fidelity.
+- fp16: best numeric fidelity at higher memory cost and lower speed.
+- Keep measurement workloads identical across quant levels.
 """
 
 import time
@@ -23,9 +22,8 @@ from harness.metrics import BenchmarkResult, MemoryTracker
 
 OLLAMA_URL = "http://localhost:11434"
 
-# Ollama quantization tags for the same base model
 QUANT_MODELS = {
-    "Q4_K_M": "llama3.1:8b",           # Default 4-bit, what most people use
+    "Q4_K_M": "llama3.1:8b",           # Default 4-bit
     "Q8_0":   "llama3.1:8b-q8_0",      # 8-bit, higher quality
 }
 
@@ -89,7 +87,6 @@ class QuantBenchmark:
         for quant_label, model in QUANT_MODELS.items():
             print(f"\n[Quant] Testing {quant_label} ({model})")
             
-            # Check model is available
             try:
                 r = httpx.get(f"{OLLAMA_URL}/api/tags", timeout=5)
                 available = [m["name"] for m in r.json().get("models", [])]

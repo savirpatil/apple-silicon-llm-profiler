@@ -1,7 +1,21 @@
 #!/usr/bin/env python3
 """
-Checkpoint A2: First baseline benchmark using Ollama (Metal/CPU).
+Quick baseline runner for fast comparisons.
+
+This script runs short, repeatable baseline benchmarks across a small
+set of models and backends to produce quick comparative numbers
+(useful for development feedback and CI smoke tests).
+
+Core responsibilities:
+- Run compact workloads (short prompts, low max_new_tokens) for each backend.
+- Produce concise metrics (TTFT, latency, tokens/sec) for fast comparison.
+- Exit quickly on failures with informative messages.
+
+Recommended notes:
+- Designed for iteration: keep runtime short and deterministic.
+- Useful as a pre-commit or CI smoke check.
 """
+
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
