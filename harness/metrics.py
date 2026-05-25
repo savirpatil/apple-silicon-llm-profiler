@@ -1,3 +1,20 @@
+"""
+Benchmark metrics primitives and helpers.
+
+This module defines the core measurement types and utilities used by
+benchmarks: BenchmarkResult (latency, TTFT, throughput, peak memory),
+MemoryTracker, and helpers to aggregate and serialize measurements.
+
+Core responsibilities:
+- Provide simple, typed metric containers that are easy to log/serialize.
+- Track memory and timing samples during runs.
+- Offer aggregation helpers (mean, median, per-token throughput).
+
+Recommended notes:
+- Measurements should be backend-agnostic and comparable across runs.
+- Keep serialization stable (JSON schema) for downstream reporting.
+"""
+
 import time
 import psutil
 import subprocess
@@ -63,11 +80,11 @@ def compute_statistics(results: List[BenchmarkResult]) -> BenchmarkResult:
     Takes multiple runs of the same condition and returns a single
     result with mean values and statistical spread metrics.
     
-    stddev tells you how stable the number is — a low stddev means
+    stddev tells you how stable the number is: a low stddev means
     the benchmark is reproducible. A high stddev means the system
     was doing other things (thermal throttling, memory pressure).
     
-    p95 = 95th percentile — the worst case 1 in 20 requests sees.
+    p95 = 95th percentile: the worst case 1 in 20 requests sees.
     This is more useful than max (which catches flukes) and more
     honest than mean (which hides tail latency).
     """

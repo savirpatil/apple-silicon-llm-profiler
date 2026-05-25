@@ -1,31 +1,25 @@
 """
-Thinking mode benchmark — Qwen3 and other modern models support
-an extended reasoning mode where the model "thinks" through a
-problem before answering, using a <think>...</think> block.
+Thinking Benchmark: multi-step reasoning and chain-of-thought.
 
-This is controlled via the 'thinking' parameter in Ollama.
-Thinking mode uses more tokens internally but produces better
-answers on complex problems. The tradeoff: more latency, better quality.
+This module evaluates models on multi-step or chain-of-thought style
+generations where the model performs extended internal reasoning or
+iterative steps. Metrics include latency per step, cumulative time,
+and memory footprint across reasoning depth.
 
-This benchmark measures:
-- TTFT with thinking on vs off
-- Total latency with thinking on vs off  
-- Tokens used in thinking vs answer
-- Throughput impact of thinking mode
-
-This is extremely current — Qwen3 shipped thinking mode in early 2025.
+Recommended notes:
+- Vary reasoning depth to observe scaling behavior.
+- Measure per-step TTFT and total reasoning latency.
+- Keep prompts and prompts templates consistent across runs.
 """
 
 import time
-import uuid
 import json
 import httpx
 from harness.metrics import BenchmarkResult, MemoryTracker
 
 OLLAMA_URL = "http://localhost:11434"
 
-# These prompts benefit most from thinking mode —
-# complex reasoning tasks where careful thought helps
+
 THINKING_PROMPTS = {
     "simple": "What is the capital of France?",
     "reasoning": "If a train travels 120km in 90 minutes, then speeds up by 20%, how long will it take to travel the next 150km?",
@@ -94,7 +88,6 @@ class ThinkingBenchmark:
         ttft_ms = (first_token_time - t_start) * 1000 if first_token_time else total_ms
         throughput = tokens / (eval_ms / 1000) if eval_ms > 0 else 0
 
-        # Count thinking tokens (inside <think>...</think>)
         thinking_tokens = 0
         if "<think>" in full_response and "</think>" in full_response:
             think_start = full_response.find("<think>")
@@ -125,7 +118,6 @@ class ThinkingBenchmark:
                 mode = "thinking ON" if thinking else "thinking OFF"
                 print(f"  Mode: {mode}")
 
-                # Warmup
                 for _ in range(warmup):
                     self.run_single(model, prompt, thinking)
 

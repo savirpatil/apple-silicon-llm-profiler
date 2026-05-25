@@ -1,12 +1,24 @@
 """
-Captures system environment metadata for every benchmark run.
-This is what makes results reproducible and comparable across machines.
-Without this, benchmark numbers are just numbers with no context.
+Environment helpers and runtime detection for benchmarks.
+
+This module provides utilities to detect and configure the local
+execution environment (macOS / Apple Silicon), query GPU/CPU
+capabilities, and set recommended environment variables for
+ML inference frameworks used by the harness.
+
+Core responsibilities:
+- Query device info (CPU model, chip family, amount of RAM, GPU/Metal info).
+- Provide helper functions to set or validate env vars (e.g., MLX, vLLM).
+- Small convenience helpers used by setup/verify scripts and runners.
+
+Recommended notes:
+- Keep platform-specific checks isolated here.
+- Return simple, serializable dicts for logging and result metadata.
 """
+
 import platform
 import subprocess
 import psutil
-import json
 
 
 def get_environment_info() -> dict:
@@ -34,7 +46,6 @@ def _get_chip_info() -> str:
         )
         if result.stdout.strip():
             return result.stdout.strip()
-        # Apple Silicon fallback
         result = subprocess.run(
             ["sysctl", "-n", "hw.model"],
             capture_output=True, text=True, timeout=5

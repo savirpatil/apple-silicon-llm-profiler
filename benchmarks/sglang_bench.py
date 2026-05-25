@@ -1,9 +1,21 @@
+"""
+SGLang Benchmark: short-generation language tasks.
+
+This module runs compact generation workloads (short prompts and
+small outputs) to evaluate latency and TTFT for lightweight usage
+patterns. It is useful for micro-benchmarks and measuring interactive
+responsiveness where single-token latency matters most.
+
+Recommended notes:
+- Focus on short prompts and low max_new_tokens to capture TTFT.
+- Useful for comparing interactive performance across runners.
+- Keep implementations minimal and deterministic for repeatability.
+"""
+
 import time
 import uuid
 import requests
 import subprocess
-import signal
-import os
 from benchmarks.base import BaseBenchmark
 from harness.metrics import BenchmarkResult, MemoryTracker
 
@@ -34,7 +46,6 @@ class SGLangBenchmark(BaseBenchmark):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-        # Wait for server to be ready
         self._wait_for_server(timeout=120)
         print(f"[SGLang] Server ready at {self.base_url}")
 
@@ -80,7 +91,6 @@ class SGLangBenchmark(BaseBenchmark):
 
         data = response.json()
         output_text = data.get("text", "")
-        # Rough token count from output
         total_tokens = len(output_text.split())
         total_ms = (t_end - t_start) * 1000
 

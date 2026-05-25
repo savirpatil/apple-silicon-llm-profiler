@@ -1,8 +1,21 @@
 #!/usr/bin/env python3
 """
-Full benchmark sweep: models × prompt lengths × concurrency levels.
-This is the main harness entrypoint.
+Parameter sweep driver (quantization, batching, lengths).
+
+This script automates parameter sweeps across quantization levels,
+batch sizes, and other model/run parameters to build performance
+matrices for analysis.
+
+Core responsibilities:
+- Iterate parameter grid and invoke appropriate benchmark runners.
+- Collect structured results for each configuration point.
+- Optionally parallelize independent runs and write a combined report.
+
+Recommended notes:
+- Keep sweep granularity configurable and results reproducible.
+- Limit concurrency to avoid oversubscribing hardware on a single Mac.
 """
+
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

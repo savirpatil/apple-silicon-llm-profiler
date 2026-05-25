@@ -1,3 +1,18 @@
+"""
+Ollama Benchmark: local server-based model measurements.
+
+This module benchmarks models served by Ollama.
+Ollama runs models as a separate process and exposes a serving API,
+so measurements include process and IPC overhead in addition to model
+inference time. Useful for comparing end-to-end latency and throughput
+against frameworks that run natively on Metal (e.g., MLX).
+
+Recommended notes:
+- Ollama may be CPU- or GPU-backed depending on configuration.
+- Expect extra overhead from the server process and RPC/HTTP paths.
+- Use this benchmark to compare real-world application latency vs
+  native in-process runners.
+"""
 import time
 import uuid
 import json
@@ -10,11 +25,8 @@ OLLAMA_URL = "http://localhost:11434"
 class OllamaBenchmark:
     """
     Benchmarks Ollama via its streaming HTTP API.
-    
-    Why streaming? Because it lets us measure TTFT precisely —
-    we record the exact moment the first token arrives, not just
-    when the whole response finishes. This is the metric that
-    matters most for interactive use.
+    Streaming measures TTFT precisely, recording the exact moment
+    the first token arrives, not just when the whole response finishes.
     """
     name = "ollama"
 
@@ -61,7 +73,6 @@ class OllamaBenchmark:
                 if not chunk.get("done", False) and first_token_time is None:
                     first_token_time = time.perf_counter()
                 
-                # Ollama puts final stats in the done=True chunk
                 if chunk.get("done", False):
                     final_chunk = chunk
                 
@@ -69,12 +80,10 @@ class OllamaBenchmark:
 
         t_end = time.perf_counter()
 
-        # Use Ollama's own token counts — these are exact
-        # eval_count = tokens generated, prompt_eval_count = prompt tokens
         tokens_generated = final_chunk.get("eval_count", 0)
         prompt_tokens = final_chunk.get("prompt_eval_count", 0)
         
-        # eval_duration is in nanoseconds — convert to ms
+        # eval_duration is in nanoseconds: convert to ms
         eval_duration_ms = final_chunk.get("eval_duration", 0) / 1_000_000
 
         total_ms = (t_end - t_start) * 1000

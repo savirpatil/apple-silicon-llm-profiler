@@ -1,15 +1,19 @@
 """
-The benchmark runner orchestrates the full sweep.
+Benchmark runner orchestration utilities.
 
-Key concept: concurrency simulation with asyncio.
-When concurrency=4, we fire 4 requests simultaneously and measure
-how the server handles the load. This reveals:
-- Does throughput scale with concurrency? (good server)
-- Does latency blow up? (memory/compute bottleneck)
-- Does TTFT degrade? (queuing effects)
+This module coordinates instantiation and execution of benchmark
+implementations. It maps model/config entries to concrete benchmark
+classes, runs the setup/run_single/teardown lifecycle, and collects
+and aggregates results for reporting.
 
-We use asyncio + httpx.AsyncClient for true async I/O —
-requests overlap in time, not sequentially.
+Core responsibilities:
+- Load model matrix (optionally from config/models.yaml) and map to backends.
+- Provide high-level run loop that handles retries, timeouts, and warmups.
+- Aggregate results and emit them via harness.logger and metrics.
+
+Recommended notes:
+- Keep backend selection pluggable (factory map).
+- Do not embed backend-specific logic here; benchmarks themselves own that.
 """
 
 import asyncio
@@ -103,7 +107,7 @@ async def run_concurrent_batch(
     """
     Fire `concurrency` requests at the same time and collect all results.
 
-    asyncio.gather() is the key — it launches all coroutines simultaneously
+    asyncio.gather() is the key that launches all coroutines simultaneously
     and waits for all of them to finish. The wall-clock time reflects
     real concurrent load on the server.
     """
@@ -144,7 +148,7 @@ def run_full_sweep(config: SweepConfig, logger=None) -> List[BenchmarkResult]:
                 print(f"\n[{condition_num}/{total_conditions}] "
                       f"model={model} | prompt={prompt_length} | concurrency={concurrency}")
 
-                # Warmup — not recorded, just primes the model cache
+                # Warmup
                 print(f"  Warming up ({config.warmup_runs} runs)...")
                 for _ in range(config.warmup_runs):
                     asyncio.run(run_concurrent_batch(
@@ -180,7 +184,6 @@ def run_full_sweep(config: SweepConfig, logger=None) -> List[BenchmarkResult]:
                 if not run_results:
                     continue
 
-                # Use compute_statistics for mean, stddev, p95
                 final = compute_statistics(run_results)
                 all_results.append(final)
                 print(f"  ✓ AVG: {final.throughput_tok_per_sec:.1f} tok/s ±{final.throughput_stddev:.1f} | "
@@ -191,7 +194,7 @@ def run_full_sweep(config: SweepConfig, logger=None) -> List[BenchmarkResult]:
 
 def run_mlx_sweep(config: SweepConfig, mlx_models: list, logger=None) -> List[BenchmarkResult]:
     """
-    MLX sweep — same conditions as Ollama sweep but runs in-process.
+    MLX sweep: same conditions as Ollama sweep but runs in-process.
 
     Key difference from Ollama: MLX is a library call, not an HTTP server.
     This means lower overhead per request but no real concurrency.

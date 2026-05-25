@@ -1,3 +1,16 @@
+"""
+vLLM Benchmark: server-side high-throughput comparisons.
+
+This module benchmarks vLLM-style servers (high-performance batched
+inference backends) to compare throughput, batching efficiency, and
+latency against native Apple Silicon runners. Typically used for
+cross-platform comparisons where vLLM runs on separate GPU servers.
+
+Recommended notes:
+- Measure batching efficiency, tokens/sec, and tail latencies.
+- vLLM workloads are useful when comparing large-scale serving setups.
+- Ensure identical prompts and batch sizes when comparing frameworks.
+"""
 import time
 import uuid
 from typing import Optional

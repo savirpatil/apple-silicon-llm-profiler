@@ -1,19 +1,18 @@
 """
-Thermal throttling benchmark.
+Thermal Benchmark: sustained performance and throttling.
 
-Apple Silicon throttles under sustained load — the M4 in a MacBook
-runs faster for the first 2 minutes than after 10 minutes as the
-chip heats up and the firmware reduces clock speeds to stay within
-thermal limits.
+This module measures sustained throughput, latency drift, and device
+thermal characteristics over extended runs. It helps identify
+thermal throttling points on Apple Silicon and quantify performance
+degradation under continuous load.
 
-This benchmark runs continuous inference for a set duration and
-samples throughput every N seconds, revealing the throttling curve.
-
-This is essentially unexplored territory in public benchmarks.
+Recommended notes:
+- Sample temperature and performance at regular intervals.
+- Report sustained throughput and any drop from initial levels.
+- Use realistic workloads to emulate production conditions.
 """
 
 import time
-import uuid
 import json
 import httpx
 import subprocess
@@ -25,7 +24,7 @@ OLLAMA_URL = "http://localhost:11434"
 def get_cpu_temp() -> float:
     """
     Get CPU temperature on macOS using powermetrics.
-    Requires sudo — returns -1 if unavailable.
+    Requires sudo - returns -1 if unavailable.
     We use 'cpu_thermal_level' as a proxy since direct temp
     readings require root on modern macOS.
     """
@@ -73,7 +72,6 @@ class ThermalBenchmark:
             if elapsed >= duration_seconds:
                 break
 
-            # Run one inference request
             payload = {
                 "model": model,
                 "prompt": prompt,
@@ -106,7 +104,6 @@ class ThermalBenchmark:
             throughput = tokens / (eval_ms / 1000) if eval_ms > 0 else 0
             request_count += 1
 
-            # Sample on interval
             now = time.perf_counter()
             if now - last_sample_time >= sample_interval:
                 elapsed_min = elapsed / 60
