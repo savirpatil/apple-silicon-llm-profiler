@@ -4,3 +4,8 @@ __pycache__/
 wandb/
 *.log
 .venv/
+.DS_Store
+.env
+results/runs/*
+!results/runs/.gitkeep
+results/advanced_results.json
