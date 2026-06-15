@@ -7,9 +7,9 @@ classes, runs the setup/run_single/teardown lifecycle, and collects
 and aggregates results for reporting.
 
 Core responsibilities:
-- Load model matrix (optionally from config/models.yaml) and map to backends.
+- Convert the typed YAML config into concrete framework sweeps.
 - Provide high-level run loop that handles retries, timeouts, and warmups.
-- Aggregate results and emit them via harness.logger and metrics.
+- Aggregate results and produce capacity-planning summaries.
 
 Recommended notes:
 - Keep backend selection pluggable (factory map).
@@ -23,7 +23,9 @@ import json
 import httpx
 from typing import List, Dict
 from dataclasses import dataclass
+from harness.config import BenchmarkConfig
 from harness.metrics import BenchmarkResult, MemoryTracker, compute_statistics
+from harness.summary import CapacitySLO, summarize_capacity
 
 OLLAMA_URL = "http://localhost:11434"
 
@@ -36,6 +38,54 @@ class SweepConfig:
     max_new_tokens: int = 128
     warmup_runs: int = 2
     bench_runs: int = 5
+
+
+def sweep_config_from_benchmark_config(
+    config: BenchmarkConfig,
+    models: List[str],
+) -> SweepConfig:
+    return SweepConfig(
+        models=models,
+        prompt_lengths={
+            name: prompt.text for name, prompt in config.prompt_lengths.items()
+        },
+        concurrency_levels=config.concurrency_levels,
+        max_new_tokens=config.max_new_tokens,
+        warmup_runs=config.warmup_runs,
+        bench_runs=config.benchmark_runs,
+    )
+
+
+def run_capacity_suite(
+    config: BenchmarkConfig,
+    logger=None,
+) -> tuple[List[BenchmarkResult], dict]:
+    """
+    Run every configured framework and return raw results plus the
+    capacity-planner summary used by the CLI and dashboard.
+    """
+    all_results: List[BenchmarkResult] = []
+
+    if "ollama" in config.frameworks and config.ollama_models:
+        ollama_config = sweep_config_from_benchmark_config(
+            config, config.ollama_models
+        )
+        all_results.extend(run_full_sweep(ollama_config, logger=logger))
+
+    if "mlx" in config.frameworks and config.mlx_models:
+        mlx_config = sweep_config_from_benchmark_config(config, [])
+        all_results.extend(run_mlx_sweep(
+            mlx_config, config.mlx_models, logger=logger
+        ))
+
+    summary = summarize_capacity(
+        all_results,
+        CapacitySLO(
+            ttft_ms=config.slo.ttft_ms,
+            p95_latency_ms=config.slo.p95_latency_ms,
+        ),
+    )
+    return all_results, summary
 
 
 async def _single_async_request(

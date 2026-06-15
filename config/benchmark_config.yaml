@@ -1,3 +1,7 @@
+frameworks:
+  - ollama
+  - mlx
+
 concurrency_levels: [1, 4, 8, 16]
 
 prompt_lengths:
@@ -11,18 +15,17 @@ prompt_lengths:
     tokens: 512
     text: "You are an expert in distributed systems. Please explain in detail: 1) The CAP theorem and its implications, 2) How modern databases like Cassandra and DynamoDB handle consistency vs availability tradeoffs, 3) What eventual consistency means in practice, and 4) How you would design a globally distributed key-value store that prioritizes availability."
 
-batch_sizes: [1, 4, 8]
-
 max_new_tokens: 128
 num_warmup_runs: 2
-num_benchmark_runs: 5
+num_benchmark_runs: 3
+
+slo:
+  ttft_ms: 1000
+  p95_latency_ms: 10000
 
 models:
-  qwen3_7b:
-    ollama_name: "qwen3:7b"
-    hf_name: "Qwen/Qwen3-7B"
-    mlx_name: "mlx-community/Qwen3-7B-4bit"
+  qwen_25_7b:
+    ollama_name: "qwen2.5:7b"
+    mlx_name: "mlx-community/Qwen2.5-7B-Instruct-4bit"
   llama_31_8b:
     ollama_name: "llama3.1:8b"
-    hf_name: "meta-llama/Meta-Llama-3.1-8B"
-    mlx_name: "mlx-community/Meta-Llama-3.1-8B-4bit"

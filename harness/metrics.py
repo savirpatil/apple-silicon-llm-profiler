@@ -92,7 +92,7 @@ def compute_statistics(results: List[BenchmarkResult]) -> BenchmarkResult:
 
     n = len(results)
     if n == 0:
-        return results[0]
+        raise ValueError("cannot compute statistics for an empty result set")
 
     tps_values = [r.throughput_tok_per_sec for r in results]
     ttft_values = [r.ttft_ms for r in results]
@@ -129,13 +129,21 @@ def compute_statistics(results: List[BenchmarkResult]) -> BenchmarkResult:
         throughput_tok_per_sec=round(sum(tps_values) / n, 2),
         throughput_stddev=round(statistics.stdev(tps_values) if n > 1 else 0.0, 2),
         throughput_p50=round(statistics.median(tps_values), 2),
-        throughput_p95=round(sorted(tps_values)[int(n * 0.95)] if n > 1 else tps_values[0], 2),
-        ttft_p95=round(sorted(ttft_values)[int(n * 0.95)] if n > 1 else ttft_values[0], 2),
+        throughput_p95=round(_percentile(tps_values, 0.95), 2),
+        ttft_p95=round(_percentile(ttft_values, 0.95), 2),
         ttft_stddev=round(statistics.stdev(ttft_values) if n > 1 else 0.0, 2),
         peak_memory_mb=max(r.peak_memory_mb for r in results),
         memory_bandwidth_utilization_pct=bw_util,
         run_id=r.run_id,
     )
+
+
+def _percentile(values: List[float], percentile: float) -> float:
+    if not values:
+        raise ValueError("percentile requires at least one value")
+    ordered = sorted(values)
+    index = min(len(ordered) - 1, max(0, int(round((len(ordered) - 1) * percentile))))
+    return ordered[index]
 
 
 class MemoryTracker:
